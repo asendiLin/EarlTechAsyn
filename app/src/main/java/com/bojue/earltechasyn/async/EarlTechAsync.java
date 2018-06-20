@@ -1,10 +1,10 @@
 package com.bojue.earltechasyn.async;
 
-import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 
+import java.util.ArrayDeque;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,7 +20,6 @@ public abstract class EarlTechAsync<P, R> implements IAsync<P, R> {
     private static final int DEFAULT_THREAD_COUNT = 5;
     private static final int RESULT = 1;
     private static final int CANCELED = 0;
-
 
     enum STATE {
         FINISHED,
@@ -112,14 +111,33 @@ public abstract class EarlTechAsync<P, R> implements IAsync<P, R> {
         message.what=CANCELED;
         asyncHandler.sendMessage(message);
     }
-
+    ArrayDeque<Runnable> tasks=new ArrayDeque<>();
     private void startExecute() {
 
         if (mSTATE == STATE.RUNNING) {
             throw new IllegalStateException("there has task running!");
         }
         mSTATE = STATE.RUNNING;
-        mExecutorService.execute(mFuture);
+
+        tasks.offer(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mFuture.run();
+                }catch (Exception e){
+                }finally {
+                    scheduleNext();
+                }
+            }
+        });
+
+        scheduleNext();
+    }
+
+    private void scheduleNext() {
+        Runnable mActive;
+        if ((mActive=tasks.poll())!=null)
+            mExecutorService.execute(mActive);
     }
 
 
